@@ -3,6 +3,8 @@ KDIR=/lib/modules/$(shell uname -r)/build
 CFLAGS_user = -std=gnu11 -Wall -Wextra -Werror
 LDFLAGS_user = -lpthread
 TARGET_MODULE := khttpd
+PORT := 1999
+INDEX := 20
 obj-m += khttpd.o
 khttpd-objs := \
 	bignum.o \
@@ -54,7 +56,7 @@ load:
 unload:
 	sudo rmmod $(TARGET_MODULE) || true >/dev/null
 
-relaod:
+reload:
 	$(MAKE) unload
 	sudo dmesg -C
 	$(MAKE) load
@@ -62,3 +64,6 @@ relaod:
 request:
 	wget localhost:1999/fib/$(k)
 	dmesg
+
+verify:
+	@python3 scripts/verify.py -p $(PORT) -i $(INDEX)
