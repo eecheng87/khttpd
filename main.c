@@ -4,7 +4,7 @@
 #include <linux/sched/signal.h>
 #include <linux/tcp.h>
 #include <net/sock.h>
-#include "bignum.h"
+
 #include "http_server.h"
 
 #define DEFAULT_PORT 8081
@@ -97,32 +97,6 @@ static int __init khttpd_init(void)
         pr_err("can't open listen socket\n");
         return err;
     }
-    /*bignum a, b;
-    unsigned long long k = 20;
-    int err, i = 31 - __builtin_clz(k);
-    bignum big_two;
-    int_to_bignum(0, &a);
-    int_to_bignum(1, &b);
-    int_to_bignum(2, &big_two);
-    for (; i >= 0; i--) {
-        bignum t1, t2;
-        bignum tmp1, tmp2;
-        multiply_bignum(&b, &big_two, &tmp1);
-        (void) subtract_bignum(&tmp1, &a, &tmp2);
-        multiply_bignum(&a, &tmp2, &t1);
-        multiply_bignum(&a, &a, &tmp1);
-        multiply_bignum(&b, &b, &tmp2);
-        (void) add_bignum(&tmp1, &tmp2, &t2);
-        copy(&a, &t1);
-        copy(&b, &t2);
-        if ((k & (1 << i)) > 0) {
-            (void) add_bignum(&a, &b, &t1);
-            copy(&a, &b);
-            copy(&b, &t1);
-        }
-    }
-    print_bignum(&a);
-    */
     param.listen_socket = listen_socket;
     http_server = kthread_run(http_server_daemon, &param, KBUILD_MODNAME);
     if (IS_ERR(http_server)) {

@@ -12,13 +12,13 @@
 #define HTTP_RESPONSE_200_DUMMY                               \
     ""                                                        \
     "HTTP/1.1 200 OK" CRLF "Server: " KBUILD_MODNAME CRLF     \
-    "Content-Type: text/plain" CRLF "Content-Length: 12" CRLF \
-    "Connection: Close" CRLF CRLF "Hello World!" CRLF
+    "Content-Type: text/plain" CRLF "Content-Length: %d" CRLF \
+    "Connection: Close" CRLF CRLF "%s" CRLF
 #define HTTP_RESPONSE_200_KEEPALIVE_DUMMY                     \
     ""                                                        \
     "HTTP/1.1 200 OK" CRLF "Server: " KBUILD_MODNAME CRLF     \
-    "Content-Type: text/plain" CRLF "Content-Length: 12" CRLF \
-    "Connection: Keep-Alive" CRLF CRLF "Hello World!" CRLF
+    "Content-Type: text/plain" CRLF "Content-Length: %d" CRLF \
+    "Connection: Keep-Alive" CRLF CRLF "%s" CRLF
 #define HTTP_RESPONSE_501                                              \
     ""                                                                 \
     "HTTP/1.1 501 Not Implemented" CRLF "Server: " KBUILD_MODNAME CRLF \
@@ -72,7 +72,82 @@ static int http_server_send(struct socket *sock, const char *buf, size_t size)
     }
     return done;
 }
+static int _log10(size_t N)
+{
+    int i;
+    unsigned int vals[] = {
+        1UL,      10UL,      100UL,      1000UL,      10000UL,
+        100000UL, 1000000UL, 10000000UL, 100000000UL, 1000000000UL,
+    };
+    for (i = 0; i < 9; ++i) {
+        if (N >= vals[i] && N < vals[i + 1]) {
+            break;
+        }
+    }
+    return i + 1;
+}
+static char *fib(unsigned long long k)
+{
+    char *newstr, *p;
+    int index = 0;
+    bignum a, b;
+    int i = 31 - __builtin_clz(k);
+    bignum big_two;
+    int_to_bignum(0, &a);
+    int_to_bignum(1, &b);
+    int_to_bignum(2, &big_two);
+    for (; i >= 0; i--) {
+        bignum t1, t2;
+        bignum tmp1, tmp2;
+        multiply_bignum(&b, &big_two, &tmp1);
+        (void) subtract_bignum(&tmp1, &a, &tmp2);
+        multiply_bignum(&a, &tmp2, &t1);
+        multiply_bignum(&a, &a, &tmp1);
+        multiply_bignum(&b, &b, &tmp2);
+        (void) add_bignum(&tmp1, &tmp2, &t2);
+        copy(&a, &t1);
+        copy(&b, &t2);
+        if ((k & (1 << i)) > 0) {
+            (void) add_bignum(&a, &b, &t1);
+            copy(&a, &b);
+            copy(&b, &t1);
+        }
+    }
+    newstr = kmalloc(a.lastdigit + 1, GFP_KERNEL);
+    if (!newstr)
+        return NULL;
+    p = newstr;
+    /* copy the string. */
+    while (index < a.lastdigit) {
+        *p++ = a.digits[index];
+        index++;
+    }
+    *p = '\0';
+    return newstr;
+}
+static char *parse_url(char *url, int keep_alive)
+{
+    size_t size;
+    char const *del = "/";
+    char *token, *tmp = url, *fib_res = NULL, *res;
+    char *msg = keep_alive ? HTTP_RESPONSE_200_KEEPALIVE_DUMMY
+                           : HTTP_RESPONSE_200_DUMMY;
+    tmp++;
+    token = strsep(&tmp, del);
+    if (strcmp(token, "fib") == 0) {
+        /* expected tmp is number now */
+        long k;
+        kstrtol(tmp, 10, &k);
+        fib_res = fib((unsigned long long) k);
+    }
+    if (!fib_res)
+        return NULL;
+    size = strlen(msg) + strlen(fib_res) + _log10(strlen(fib_res)) - 4;
+    res = kmalloc(size, GFP_KERNEL);
+    snprintf(res, size, msg, strlen(fib_res), fib_res);
 
+    return res;
+}
 static int http_server_response(struct http_request *request, int keep_alive)
 {
     char *response;
@@ -81,9 +156,9 @@ static int http_server_response(struct http_request *request, int keep_alive)
     if (request->method != HTTP_GET)
         response = keep_alive ? HTTP_RESPONSE_501_KEEPALIVE : HTTP_RESPONSE_501;
     else
-        response = keep_alive ? HTTP_RESPONSE_200_KEEPALIVE_DUMMY
-                              : HTTP_RESPONSE_200_DUMMY;
-    http_server_send(request->socket, response, strlen(response));
+        response = parse_url(request->request_url, keep_alive);
+    if (response)
+        http_server_send(request->socket, response, strlen(response));
     return 0;
 }
 

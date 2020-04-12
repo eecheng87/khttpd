@@ -1,16 +1,4 @@
 #include "bignum.h"
-/* ************************************** */
-/*      print a Big integer               */
-/*      Input : A big integer pointer     */
-/*      Return : None                     */
-/* ************************************** */
-void print_bignum(bignum *n)
-{
-    if (n->signbit == MINUS)
-        printk("- ");
-    printk(n->digits);
-    //   printf("\n");
-}
 /* ************************************************ */
 /*      Convert an char array into big integer      */
 /*      Input : A string  and a big integer         */

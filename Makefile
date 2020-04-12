@@ -2,7 +2,7 @@ KDIR=/lib/modules/$(shell uname -r)/build
 
 CFLAGS_user = -std=gnu11 -Wall -Wextra -Werror
 LDFLAGS_user = -lpthread
-
+TARGET_MODULE := khttpd
 obj-m += khttpd.o
 khttpd-objs := \
 	bignum.o \
@@ -47,3 +47,18 @@ http_parser.c:
 
 distclean: clean
 	$(RM) http_parser.c http_parser.h
+
+load:
+	sudo insmod $(TARGET_MODULE).ko port=1999
+
+unload:
+	sudo rmmod $(TARGET_MODULE) || true >/dev/null
+
+relaod:
+	$(MAKE) unload
+	sudo dmesg -C
+	$(MAKE) load
+
+request:
+	wget localhost:1999/fib/$(k)
+	dmesg
