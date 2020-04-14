@@ -19,6 +19,10 @@ static struct socket *listen_socket;
 static struct http_server_param param;
 static struct task_struct *http_server;
 
+/* extern var. in http_server.c */
+struct workqueue_struct *khttp_wq;
+
+
 static inline int setsockopt(struct socket *sock,
                              int level,
                              int optname,
@@ -97,6 +101,7 @@ static int __init khttpd_init(void)
         pr_err("can't open listen socket\n");
         return err;
     }
+    khttp_wq = alloc_workqueue("cmwq", WQ_UNBOUND, 0);
     param.listen_socket = listen_socket;
     http_server = kthread_run(http_server_daemon, &param, KBUILD_MODNAME);
     if (IS_ERR(http_server)) {
@@ -109,6 +114,7 @@ static int __init khttpd_init(void)
 
 static void __exit khttpd_exit(void)
 {
+    destroy_workqueue(khttp_wq);
     send_sig(SIGTERM, http_server, 1);
     kthread_stop(http_server);
     close_listen_socket(listen_socket);
